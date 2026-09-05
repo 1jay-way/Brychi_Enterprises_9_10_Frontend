@@ -20,7 +20,7 @@
   <div class="container reveal">
     <span class="eyebrow" style="color:var(--cyan)">About Brychi Enterprises</span>
     <h1>The people, story and purpose behind the brand.</h1>
-    <p>Meet Vera Omo Igwebuike and explore the company's mission, partnership journey and customer experiences.</p>
+    <p>Meet Mrs Vera Omo Igwebuike and explore the company's mission, partnership journey and customer experiences.</p>
   </div>
 </section>
 
@@ -33,7 +33,7 @@
     <div class="editorial-copy">
       <span class="eyebrow">Our Mission</span>
       <h2>Wellness and wealth, presented with purpose.</h2>
-      <p>Brychi Enterprises operates under the leadership of Vera Omo Igwebuike and is based in Adeniyi Jones, Ikeja, Lagos.</p>
+      <p>Brychi Enterprises operates under the leadership of Mrs Vera Omo Igwebuike and is based in Adeniyi Jones, Ikeja, Lagos.</p>
       <p>The business works with Double Plus Company to introduce Quantum Energy wellness products and related training opportunities to customers and prospective partners.</p>
       <a class="btn btn-primary" href="shop.html">Explore the Collection</a>
     </div>
@@ -91,7 +91,7 @@ My favorite is the Quantum sticks — I wear them regularly and have seen great 
     <div class="feature-copy reveal"><span class="eyebrow" style="color:var(--cyan)">Partner With Us</span><h2>Build something alongside the brand.</h2><p>Learn about training, seminars and partnership opportunities around the Quantum product range.</p><a class="btn btn-primary" href="#question">Start a Conversation</a></div>
     <div class="feature-art reveal">
       <!-- PARTNERSHIP IMAGE: Replace with an approved seminar/team photo. -->
-      <img src="https://via.placeholder.com/900x700?text=PARTNER+WITH+US" alt="Partnership and seminar placeholder" loading="lazy">
+      <img src="images/dunimg2.jpeg" loading="lazy">
     </div>
   </div>
 </section>
@@ -99,11 +99,20 @@ My favorite is the Quantum sticks — I wear them regularly and have seen great 
 <section class="section" id="question">
   <div class="container">
     <div class="question reveal">
-      <div><span class="eyebrow">Ask A Question</span><h2>Let's make your question easy to send.</h2><p>Make this section a clear, comfortable place for visitors to ask about products, seminars or partnership opportunities.</p></div>
+      <div><span class="eyebrow">Ask A Question</span>
+        <h2>Let's make your questions easy to answer.</h2>
+        <p></p></div>
       <form class="form-grid" onsubmit="event.preventDefault(); const n=this.name.value; const p=this.phone.value; const m=this.message.value; window.open(waLink(`Good day Brychi Enterprises,\\n\\nName: ${n}\\nPhone: ${p}\\nQuestion: ${m}`),'_blank');">
-        <div class="field"><label>Your full name</label><input name="name" required placeholder="Enter your name"></div>
-        <div class="field"><label>Phone / WhatsApp</label><input name="phone" required placeholder="080..."></div>
-        <div class="field"><label>Your question</label><textarea name="message" rows="6" required placeholder="Type your question here..."></textarea></div>
+        <div class="field"><label>Your full name</label>
+          <input name="name" required placeholder="Enter your name"></div>
+        <div class="field">
+          <label>Phone / WhatsApp</label>
+          <input name="phone" required placeholder="080..."></div>
+        <div class="field">
+          <label>Your question</label><textarea name="message" rows="6" required placeholder="Type your question here...">
+
+          </textarea>
+        </div>
         <button class="btn btn-primary" type="submit">Send via WhatsApp →</button>
       </form>
     </div>
