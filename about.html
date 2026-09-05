@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brychi Enterprises — About Us</title><link rel="stylesheet" href="shared.css">
+</head><body>
+<header class="site-header">
+  <div class="container navbar">
+    <a class="logo" href="index.html">Brychi <span>Enterprises</span></a>
+    <button id="menu-btn" class="menu-btn" aria-label="Open menu">☰</button>
+    <nav id="nav-links" class="nav-links">
+      <a class="" href="index.html">Home</a>
+      <a class="active" href="about.html">About Us</a>
+      <a class="" href="shop.html">Shop</a>
+      <a class=" cart-link" href="cart.html">Cart <span class="badge" id="cart-badge">0</span></a>
+    </nav>
+  </div>
+</header>
+
+<section class="page-hero">
+  <div class="container reveal">
+    <span class="eyebrow" style="color:var(--cyan)">About Brychi Enterprises</span>
+    <h1>The people, story and purpose behind the brand.</h1>
+    <p>Meet Vera Omo Igwebuike and explore the company's mission, partnership journey and customer experiences.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container editorial reveal">
+    <div class="editorial-image">
+      <!-- ABOUT VIDEO 1: Vera's main About Us video. Replace src with the real video file if available. -->
+      <video src="video/realvideo1.mp4" controls playsinline muted loop preload="metadata" poster="images/vera-poster.jpg" title="Vera Omo Igwebuike — About"></video>
+    </div>
+    <div class="editorial-copy">
+      <span class="eyebrow">Our Mission</span>
+      <h2>Wellness and wealth, presented with purpose.</h2>
+      <p>Brychi Enterprises operates under the leadership of Vera Omo Igwebuike and is based in Adeniyi Jones, Ikeja, Lagos.</p>
+      <p>The business works with Double Plus Company to introduce Quantum Energy wellness products and related training opportunities to customers and prospective partners.</p>
+      <a class="btn btn-primary" href="shop.html">Explore the Collection</a>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top:30px">
+  <div class="container">
+    <div class="section-head reveal"><span class="eyebrow">The Journey</span><h2>More moments. More room for the story.</h2><p>QUANTUM IS NOT MAGIC. SCIENTIST HAS PROVEN IT .</p></div>
+    <div class="gallery reveal">
+      <!-- ABOUT PHOTO 2 -->
+      <video src="video/video2.mp4" controls playsinline muted loop preload="metadata" title="Brychi Enterprises moment 2"></video>
+      <!-- ABOUT PHOTO 3 -->
+      <video src="video/video3.mp4" controls playsinline muted loop preload="metadata" title="Brychi Enterprises moment 3"></video>
+      <!-- ABOUT PHOTO 4 -->
+      <video src="video/video4.mp4" controls playsinline muted loop preload="metadata" title="Brychi Enterprises moment 4"></video>
+      <!-- ABOUT PHOTO 5 -->
+      <video src="video/video5.mp4" controls playsinline muted loop preload="metadata" title="Brychi Enterprises moment 5"></video>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head reveal"><span class="eyebrow">Customer Experiences</span><h2>Testimonials, without letting one video take over the page.</h2></div>
+    <div class="testimonial-layout">
+      <div class="video-box reveal">
+        <!-- TESTIMONIAL VIDEO: Replace the placeholder YouTube URL with the real video embed URL. -->
+        <iframe src="https://www.youtube.com/embed/placeholder" title="Brychi Enterprises testimonial video" allowfullscreen loading="lazy"></iframe>
+      </div>
+      <div class="testimonial-note reveal">
+        <p>“I have been using Quantum products for years. For the past five years, my family and I have not needed to visit the hospital for routine issues like stomach aches. The products have become a trusted part of our daily life.
+
+We own several Quantum items: the Quantum bracelet, which my children wear to school and is very fashionable; the Quantum scarf, which has been effective for us; and the Quantum sticks, which I wear all the time.
+
+My favorite is the Quantum sticks — I wear them regularly and have seen great results.”</p>
+        <small>— Customer testimonial placeholder</small>
+      </div>
+    </div>
+    <div class="gallery reveal" style="margin-top:28px">
+      <!-- TESTIMONIAL PHOTO 1: Normal uploaded image, not a YouTube link. -->
+      <img src="https://via.placeholder.com/700x700?text=TESTIMONIAL+01" alt="" loading="lazy">
+      <!-- TESTIMONIAL PHOTO 2 -->
+      <img src="https://via.placeholder.com/700x850?text=TESTIMONIAL+02" alt="" loading="lazy">
+      <!-- TESTIMONIAL PHOTO 3 -->
+      <img src="https://via.placeholder.com/700x700?text=TESTIMONIAL+03" alt="" loading="lazy">
+      <!-- TESTIMONIAL PHOTO 4 -->
+      <img src="https://via.placeholder.com/700x850?text=TESTIMONIAL+04" alt="" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<section class="section feature-band">
+  <div class="container">
+    <div class="feature-copy reveal"><span class="eyebrow" style="color:var(--cyan)">Partner With Us</span><h2>Build something alongside the brand.</h2><p>Learn about training, seminars and partnership opportunities around the Quantum product range.</p><a class="btn btn-primary" href="#question">Start a Conversation</a></div>
+    <div class="feature-art reveal">
+      <!-- PARTNERSHIP IMAGE: Replace with an approved seminar/team photo. -->
+      <img src="https://via.placeholder.com/900x700?text=PARTNER+WITH+US" alt="Partnership and seminar placeholder" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<section class="section" id="question">
+  <div class="container">
+    <div class="question reveal">
+      <div><span class="eyebrow">Ask A Question</span><h2>Let's make your question easy to send.</h2><p>Make this section a clear, comfortable place for visitors to ask about products, seminars or partnership opportunities.</p></div>
+      <form class="form-grid" onsubmit="event.preventDefault(); const n=this.name.value; const p=this.phone.value; const m=this.message.value; window.open(waLink(`Good day Brychi Enterprises,\\n\\nName: ${n}\\nPhone: ${p}\\nQuestion: ${m}`),'_blank');">
+        <div class="field"><label>Your full name</label><input name="name" required placeholder="Enter your name"></div>
+        <div class="field"><label>Phone / WhatsApp</label><input name="phone" required placeholder="080..."></div>
+        <div class="field"><label>Your question</label><textarea name="message" rows="6" required placeholder="Type your question here..."></textarea></div>
+        <button class="btn btn-primary" type="submit">Send via WhatsApp →</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div><h3>Brychi Enterprises</h3><p>Wellness, products and partnership opportunities presented with a modern customer experience.</p></div>
+      <div><h3>Explore</h3><p><a href="index.html">Home</a></p><p><a href="about.html">About Us</a></p><p><a href="shop.html">Shop</a></p></div>
+      <div><h3>Connect</h3><p><a target="_blank" href="https://wa.me/2348023139293">WhatsApp</a></p><p>Adeniyi Jones, Ikeja, Lagos</p></div>
+    </div>
+    <div class="footer-bottom">© 2026 Brychi Enterprises. All Rights Reserved.</div>
+  </div>
+</footer>
+<script type="module" src="app.js"></script></body></html>
