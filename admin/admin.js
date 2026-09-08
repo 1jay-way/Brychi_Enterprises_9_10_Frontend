@@ -53,7 +53,6 @@ import {
   updateDoc,
   deleteDoc,
   query,
-  orderBy,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
@@ -173,8 +172,6 @@ if (loginForm) {
   loginForm.addEventListener("submit", async (event) => {
 
     /*
-      VERY IMPORTANT:
-
       Prevent the browser from refreshing the page when
       the login form is submitted.
     */
@@ -785,10 +782,26 @@ async function loadProducts() {
     await firebaseReady;
 
 
+    /*
+      IMPORTANT:
+
+      Do NOT use orderBy("createdAt", "desc") here.
+
+      The migrated products from Lotaja do not have
+      a createdAt field, so using orderBy() would exclude
+      those documents from the query.
+
+      Loading the collection directly allows both:
+
+      - Migrated products
+      - Products created from the admin dashboard
+
+      to appear together.
+    */
+
     const productsQuery =
       query(
-        collection(db, "products"),
-        orderBy("createdAt", "desc")
+        collection(db, "products")
       );
 
 
