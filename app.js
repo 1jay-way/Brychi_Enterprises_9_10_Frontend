@@ -1,1664 +1,1162 @@
-/* =========================================================
-   BRYCHI ENTERPRISES — SHARED FRONTEND JAVASCRIPT
-   ---------------------------------------------------------
-   FEATURES:
-   - Products loaded from Firebase Firestore
-   - Images loaded from Cloudinary
-   - Only active products are displayed
-   - Search works
-   - Shows 6 products initially
-   - "See More Products" loads 6 more at a time
-   - Full product description hidden by default
-   - Tap/click product image to show description
-   - Only one product description opens at a time
-   - Cart uses localStorage
-   - WhatsApp ordering remains available
-========================================================= */
-
-
-/* =========================================================
-   FIREBASE IMPORTS
-========================================================= */
-
-import {
-  db,
-  firebaseReady
-} from "./firebase-config.js";
-
+import { db, firebaseReady } from "./firebase-config.js";
 import {
   collection,
   getDocs,
   query
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-
-/* =========================================================
-   EDITABLE WHATSAPP NUMBER
-========================================================= */
-
 const WHATSAPP_NUMBER = "2348023139293";
-
-
-/* =========================================================
-   PRODUCT DISPLAY SETTINGS
-========================================================= */
-
 const PRODUCTS_PER_PAGE = 6;
 
-
-/* =========================================================
-   PRODUCT DATA
-========================================================= */
-
 let PRODUCTS = [];
-
-
-/* =========================================================
-   PRODUCT DISPLAY STATE
-========================================================= */
-
 let displayedProductCount = PRODUCTS_PER_PAGE;
-
 let currentProductList = [];
 
-
 /* =========================================================
-   GET PRODUCTS FROM FIRESTORE
-========================================================= */
+   LOAD PRODUCTS
+   ========================================================= */
 
 async function getProducts() {
-
   await firebaseReady;
 
   try {
+    const productsQuery = query(
+      collection(db, "products")
+    );
 
-    const productsQuery =
-      query(
-        collection(db, "products")
-      );
+    const snapshot = await getDocs(productsQuery);
 
-    const snapshot =
-      await getDocs(productsQuery);
+    PRODUCTS = snapshot.docs
+      .map(document => ({
+        id: document.id,
+        ...document.data()
+      }))
+      .filter(product => product.active !== false)
+      .sort((a, b) => {
+        const orderA = Number(a.sortOrder);
+        const orderB = Number(b.sortOrder);
 
+        if (
+          Number.isFinite(orderA) &&
+          Number.isFinite(orderB)
+        ) {
+          return orderA - orderB;
+        }
 
-    PRODUCTS =
-      snapshot.docs
-        .map(document => ({
-          id: document.id,
-          ...document.data()
-        }))
-        .filter(product =>
-          product.active !== false
-        );
+        if (Number.isFinite(orderA)) return -1;
+        if (Number.isFinite(orderB)) return 1;
 
+        return 0;
+      });
 
     return PRODUCTS;
-
   } catch (error) {
-
     console.error(
       "Unable to load products from Firestore:",
       error
     );
 
     PRODUCTS = [];
-
     return PRODUCTS;
   }
 }
 
-
 /* =========================================================
-   GET CART
-========================================================= */
+   CART
+   ========================================================= */
+
+const CART_KEY = "brychi_cart";
 
 function getCart() {
-
   try {
+    const savedCart =
+      localStorage.getItem(CART_KEY);
 
-    return JSON.parse(
-      localStorage.getItem("brychi_cart") || "[]"
+    if (!savedCart) {
+      return [];
+    }
+
+    const cart = JSON.parse(savedCart);
+
+    return Array.isArray(cart) ? cart : [];
+  } catch (error) {
+    console.error(
+      "Unable to read cart:",
+      error
     );
-
-  } catch {
 
     return [];
   }
 }
 
-
-/* =========================================================
-   SAVE CART
-========================================================= */
-
 function saveCart(cart) {
-
   localStorage.setItem(
-    "brychi_cart",
+    CART_KEY,
     JSON.stringify(cart)
   );
+
+  updateCartBadge();
 }
-
-
-/* =========================================================
-   UPDATE CART BADGE
-========================================================= */
 
 function updateCartBadge() {
+  const badge =
+    document.getElementById("cart-badge");
 
-  const count =
-    getCart().reduce(
-      (sum, item) =>
-        sum + item.qty,
-      0
-    );
+  if (!badge) return;
 
+  const cart = getCart();
 
-  document
-    .querySelectorAll("#cart-badge")
-    .forEach(element => {
-
-      element.textContent = count;
-
-    });
-}
-
-
-/* =========================================================
-   ADD PRODUCT TO CART
-========================================================= */
-
-function addToCart(id) {
-
-  const product =
-    PRODUCTS.find(
-      product =>
-        product.id === id
-    );
-
-
-  if (!product) return;
-
-
-  const cart =
-    getCart();
-
-
-  const existing =
-    cart.find(
-      item =>
-        item.id === id
-    );
-
-
-  if (existing) {
-
-    existing.qty =
-      Math.min(
-        existing.qty + 1,
-        10
-      );
-
-  } else {
-
-    cart.push({
-      id: id,
-      qty: 1
-    });
-
-  }
-
-
-  saveCart(cart);
-
-  updateCartBadge();
-
-
-  const button =
-    document.querySelector(
-      `[data-add="${id}"]`
-    );
-
-
-  if (button) {
-
-    const oldText =
-      button.textContent;
-
-
-    button.textContent =
-      "Added ✓";
-
-
-    setTimeout(() => {
-
-      button.textContent =
-        oldText;
-
-    }, 1000);
-
-  }
-}
-
-
-/* =========================================================
-   REMOVE PRODUCT FROM CART
-========================================================= */
-
-function removeFromCart(id) {
-
-  saveCart(
-    getCart().filter(
-      item =>
-        item.id !== id
-    )
+  const count = cart.reduce(
+    (total, item) =>
+      total + Number(item.quantity || 0),
+    0
   );
 
-
-  renderCart();
-
-  updateCartBadge();
+  badge.textContent = count;
 }
 
-
 /* =========================================================
-   CHANGE CART QUANTITY
-========================================================= */
+   ADD TO CART
+   ========================================================= */
 
-function changeQty(id, delta) {
-
-  const cart =
-    getCart();
-
-
-  const item =
-    cart.find(
-      item =>
-        item.id === id
+function addToCart(productId) {
+  if (!productId) {
+    console.error(
+      "Add to Cart: Product ID is missing."
     );
-
-
-  if (!item) return;
-
-
-  item.qty =
-    Math.max(
-      1,
-      Math.min(
-        10,
-        item.qty + delta
-      )
-    );
-
-
-  saveCart(cart);
-
-  renderCart();
-
-  updateCartBadge();
-}
-
-
-/* =========================================================
-   FORMAT PRICE
-========================================================= */
-
-function formatPrice(price) {
-
-  if (
-    price === undefined ||
-    price === null ||
-    price === "" ||
-    Number(price) <= 0
-  ) {
-
-    return "Price on request";
-  }
-
-
-  return (
-    "₦" +
-    Number(price)
-      .toLocaleString("en-NG")
-  );
-}
-
-
-/* =========================================================
-   CREATE SHORT DESCRIPTION
-========================================================= */
-
-function getShortDescription(description) {
-
-  const text =
-    String(description || "").trim();
-
-
-  if (!text) {
-
-    return "Tap image for more details.";
-  }
-
-
-  const maxLength = 70;
-
-
-  if (text.length <= maxLength) {
-
-    return text;
-  }
-
-
-  return (
-    text.substring(0, maxLength).trim() +
-    "..."
-  );
-}
-
-
-/* =========================================================
-   PRODUCT CARD
-========================================================= */
-
-function productCard(product) {
-
-  const productId =
-    escapeHTML(
-      product.id || ""
-    );
-
-
-  const image =
-    escapeHTML(
-      product.image || ""
-    );
-
-
-  const name =
-    escapeHTML(
-      product.name ||
-      "Unnamed Product"
-    );
-
-
-  const fullDescription =
-    escapeHTML(
-      product.description ||
-      "No description available."
-    );
-
-
-  const shortDescription =
-    escapeHTML(
-      getShortDescription(
-        product.description
-      )
-    );
-
-
-  return `
-    <article
-      class="product-card reveal"
-      data-product-card="${productId}"
-    >
-
-      <div
-        class="product-image-wrap product-image-toggle"
-        data-product-toggle="${productId}"
-        role="button"
-        tabindex="0"
-        aria-expanded="false"
-        aria-label="View details for ${name}"
-      >
-
-        <img
-          src="${image}"
-          alt="${name}"
-          loading="lazy"
-        >
-
-        <div class="product-image-hint">
-          Tap image for details
-        </div>
-
-      </div>
-
-
-      <div class="product-info">
-
-        <h3>
-          ${name}
-        </h3>
-
-
-        <p class="product-short-description">
-          ${shortDescription}
-        </p>
-
-
-        <div
-          class="product-full-description"
-          data-product-description="${productId}"
-          hidden
-        >
-
-          ${fullDescription}
-
-        </div>
-
-
-        <div class="product-bottom">
-
-          <span class="price">
-            ${formatPrice(product.price)}
-          </span>
-
-
-          <div class="product-actions">
-
-            <button
-              class="btn btn-primary"
-              data-add="${productId}"
-              onclick="addToCart('${productId}')"
-            >
-              Add to Cart
-            </button>
-
-
-            <a
-              class="btn btn-light"
-              target="_blank"
-              rel="noopener"
-              href="${waLink(
-                `Good day Brychi Enterprises, I would like to ask about ${product.name} from your website.`
-              )}"
-            >
-              WhatsApp
-            </a>
-
-          </div>
-
-        </div>
-
-      </div>
-
-    </article>
-  `;
-}
-
-
-/* =========================================================
-   TOGGLE PRODUCT DESCRIPTION
-========================================================= */
-
-function toggleProductDescription(productId) {
-
-  const description =
-    document.querySelector(
-      `[data-product-description="${CSS.escape(productId)}"]`
-    );
-
-
-  const toggle =
-    document.querySelector(
-      `[data-product-toggle="${CSS.escape(productId)}"]`
-    );
-
-
-  if (!description || !toggle) return;
-
-
-  const isOpen =
-    !description.hasAttribute("hidden");
-
-
-  /* -------------------------------------------------------
-     Close every product first
-  ------------------------------------------------------- */
-
-  document
-    .querySelectorAll(
-      ".product-full-description"
-    )
-    .forEach(item => {
-
-      item.hidden = true;
-
-    });
-
-
-  document
-    .querySelectorAll(
-      ".product-image-toggle"
-    )
-    .forEach(item => {
-
-      item.setAttribute(
-        "aria-expanded",
-        "false"
-      );
-
-    });
-
-
-  /* -------------------------------------------------------
-     If already open, leave it closed
-  ------------------------------------------------------- */
-
-  if (isOpen) {
-
     return;
   }
 
-
-  /* -------------------------------------------------------
-     Open selected product
-  ------------------------------------------------------- */
-
-  description.hidden = false;
-
-
-  toggle.setAttribute(
-    "aria-expanded",
-    "true"
+  const product = PRODUCTS.find(
+    item =>
+      String(item.id) ===
+      String(productId)
   );
 
+  if (!product) {
+    console.error(
+      "Add to Cart: Product not found.",
+      productId
+    );
+    return;
+  }
 
-  setTimeout(() => {
+  const cart = getCart();
 
-    description.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest"
+  const existing = cart.find(
+    item =>
+      String(item.id) ===
+      String(productId)
+  );
+
+  if (existing) {
+    existing.quantity =
+      Number(existing.quantity || 0) + 1;
+  } else {
+    cart.push({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      priceType:
+        product.priceType || "fixed",
+      priceMin: product.priceMin,
+      priceMax: product.priceMax,
+      image: product.image,
+      quantity: 1
     });
+  }
 
-  }, 50);
+  saveCart(cart);
+
+  console.log(
+    "Added to cart:",
+    product.name
+  );
 }
 
+/* =========================================================
+   REMOVE FROM CART
+   ========================================================= */
+
+function removeFromCart(productId) {
+  const cart = getCart().filter(
+    item =>
+      String(item.id) !==
+      String(productId)
+  );
+
+  saveCart(cart);
+  renderCart();
+}
 
 /* =========================================================
-   BIND PRODUCT IMAGE CLICKS
-========================================================= */
+   CHANGE QUANTITY
+   ========================================================= */
 
-function bindProductDescriptionToggles() {
+function changeQty(productId, change) {
+  const cart = getCart();
 
-  document
-    .querySelectorAll(
-      ".product-image-toggle"
+  const item = cart.find(
+    product =>
+      String(product.id) ===
+      String(productId)
+  );
+
+  if (!item) return;
+
+  item.quantity =
+    Number(item.quantity || 0) +
+    Number(change);
+
+  if (item.quantity <= 0) {
+    const index = cart.indexOf(item);
+
+    if (index !== -1) {
+      cart.splice(index, 1);
+    }
+  }
+
+  saveCart(cart);
+  renderCart();
+}
+
+/* =========================================================
+   PRODUCT HELPERS
+   ========================================================= */
+
+function escapeHTML(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function formatPrice(product) {
+  if (
+    product.priceType === "range" &&
+    Number.isFinite(
+      Number(product.priceMin)
+    ) &&
+    Number.isFinite(
+      Number(product.priceMax)
     )
-    .forEach(toggle => {
+  ) {
+    return `₦${Number(
+      product.priceMin
+    ).toLocaleString()} - ₦${Number(
+      product.priceMax
+    ).toLocaleString()}`;
+  }
 
-      const productId =
-        toggle.dataset.productToggle;
+  if (
+    product.price == null ||
+    product.price === ""
+  ) {
+    return "";
+  }
 
+  const numericPrice =
+    Number(product.price);
 
-      if (!productId) return;
+  if (!Number.isFinite(numericPrice)) {
+    return "";
+  }
 
-
-      /* Mouse / touch */
-
-      toggle.addEventListener(
-        "click",
-        () => {
-
-          toggleProductDescription(
-            productId
-          );
-
-        }
-      );
-
-
-      /* Keyboard accessibility */
-
-      toggle.addEventListener(
-        "keydown",
-        event => {
-
-          if (
-            event.key === "Enter" ||
-            event.key === " "
-          ) {
-
-            event.preventDefault();
-
-
-            toggleProductDescription(
-              productId
-            );
-
-          }
-
-        }
-      );
-
-    });
+  return `₦${numericPrice.toLocaleString()}`;
 }
 
-
-/* =========================================================
-   WHATSAPP LINK
-========================================================= */
-
-function waLink(message) {
+function getWhatsAppUrl(product) {
+  const message =
+    `Hello Brychi Enterprises, I am interested in ${product.name}. ` +
+    `Please provide more information.`;
 
   return (
-    `https://wa.me/${WHATSAPP_NUMBER}` +
-    `?text=${encodeURIComponent(message)}`
+    `https://wa.me/${WHATSAPP_NUMBER}?text=` +
+    encodeURIComponent(message)
   );
 }
 
-
 /* =========================================================
-   RENDER PRODUCTS
-   ---------------------------------------------------------
-   Shows only the current number of products.
-
-   Example:
-   6 → 12 → 18 → 24 → 30 → 32
-========================================================= */
+   PRODUCT RENDERING
+   ========================================================= */
 
 function renderProducts(
   list = PRODUCTS,
   resetCount = false
 ) {
-
-  const grid =
-    document.querySelector(
-      "#product-list"
+  const container =
+    document.getElementById(
+      "product-list"
     );
 
-
-  if (!grid) return;
-
-
-  /* -------------------------------------------------------
-     Remember the current list.
-     This is important for search + See More.
-  ------------------------------------------------------- */
-
-  currentProductList =
-    Array.isArray(list)
-      ? list
-      : [];
-
-
-  /* -------------------------------------------------------
-     Reset to first 6 products when a new list is rendered.
-  ------------------------------------------------------- */
+  if (!container) return;
 
   if (resetCount) {
-
     displayedProductCount =
       PRODUCTS_PER_PAGE;
-
   }
 
+  currentProductList = list;
 
-  if (!currentProductList.length) {
-
-    grid.innerHTML = `
-      <div
-        class="empty"
-        style="grid-column:1/-1"
-      >
-        No products available at the moment.
+  if (!list.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <h3>No products found</h3>
+        <p>Try searching for another product.</p>
       </div>
     `;
-
 
     return;
   }
 
-
-  /* -------------------------------------------------------
-     Get products that should currently be visible.
-  ------------------------------------------------------- */
-
   const visibleProducts =
-    currentProductList.slice(
+    list.slice(
       0,
       displayedProductCount
     );
 
-
-  /* -------------------------------------------------------
-     Create product cards.
-  ------------------------------------------------------- */
-
-  grid.innerHTML =
+  container.innerHTML =
     visibleProducts
-      .map(productCard)
-      .join("");
-
-
-  /* -------------------------------------------------------
-     SEE MORE BUTTON
-     Only appears when more products remain.
-  ------------------------------------------------------- */
-
-  if (
-    displayedProductCount <
-    currentProductList.length
-  ) {
-
-    const remaining =
-      currentProductList.length -
-      displayedProductCount;
-
-
-    const button =
-      document.createElement(
-        "div"
-      );
-
-
-    button.className =
-      "products-more-wrap";
-
-
-    button.style.gridColumn =
-      "1 / -1";
-
-
-    button.style.textAlign =
-      "center";
-
-
-    button.style.marginTop =
-      "30px";
-
-
-    button.innerHTML = `
-      <button
-        type="button"
-        class="btn btn-primary see-more-products"
-        id="see-more-products"
-      >
-        See More Products
-      </button>
-    `;
-
-
-    grid.appendChild(button);
-
-
-    const seeMore =
-      document.querySelector(
-        "#see-more-products"
-      );
-
-
-    if (seeMore) {
-
-      seeMore.addEventListener(
-        "click",
-        () => {
-
-          showMoreProducts();
-
-        }
-      );
-
-    }
-
-  }
-
-
-  /* -------------------------------------------------------
-     Enable product image descriptions.
-  ------------------------------------------------------- */
-
-  bindProductDescriptionToggles();
-
-
-  /* -------------------------------------------------------
-     Enable reveal animations.
-  ------------------------------------------------------- */
-
-  initReveal();
-}
-
-
-/* =========================================================
-   SHOW MORE PRODUCTS
-========================================================= */
-
-function showMoreProducts() {
-
-  /* -------------------------------------------------------
-     Add another 6 products.
-  ------------------------------------------------------- */
-
-  displayedProductCount +=
-    PRODUCTS_PER_PAGE;
-
-
-  /* -------------------------------------------------------
-     Re-render current list.
-  ------------------------------------------------------- */
-
-  renderProducts(
-    currentProductList,
-    false
-  );
-}
-
-
-/* =========================================================
-   INITIALIZE SHOP
-========================================================= */
-
-async function initShop() {
-
-  const grid =
-    document.querySelector(
-      "#product-list"
-    );
-
-
-  if (!grid) return;
-
-
-  grid.innerHTML = `
-    <div
-      class="empty"
-      style="grid-column:1/-1"
-    >
-      Loading products...
-    </div>
-  `;
-
-
-  const products =
-    await getProducts();
-
-
-  /* -------------------------------------------------------
-     Start with only 6 products.
-  ------------------------------------------------------- */
-
-  displayedProductCount =
-    PRODUCTS_PER_PAGE;
-
-
-  currentProductList =
-    products;
-
-
-  renderProducts(
-    products,
-    false
-  );
-
-
-  /* -------------------------------------------------------
-     SEARCH
-  ------------------------------------------------------- */
-
-  const search =
-    document.querySelector(
-      "#search-input"
-    );
-
-
-  if (search) {
-
-    search.addEventListener(
-      "input",
-      () => {
-
-        const searchText =
-          search.value
-            .trim()
-            .toLowerCase();
-
-
-        const filtered =
-          PRODUCTS.filter(
-            product => {
-
-              const name =
-                String(
-                  product.name || ""
-                ).toLowerCase();
-
-
-              const description =
-                String(
-                  product.description || ""
-                ).toLowerCase();
-
-
-              return (
-                name.includes(searchText) ||
-                description.includes(searchText)
-              );
-
-            }
-          );
-
-
-        /* -------------------------------------------------
-           Search results start from the beginning.
-        ------------------------------------------------- */
-
-        displayedProductCount =
-          PRODUCTS_PER_PAGE;
-
-
-        currentProductList =
-          filtered;
-
-
-        renderProducts(
-          filtered,
-          false
-        );
-
-      }
-    );
-
-  }
-}
-
-
-/* =========================================================
-   RENDER CART
-========================================================= */
-
-async function renderCart() {
-
-  const list =
-    document.querySelector(
-      "#cart-list"
-    );
-
-
-  const summary =
-    document.querySelector(
-      "#cart-summary"
-    );
-
-
-  if (!list) return;
-
-
-  const products =
-    await getProducts();
-
-
-  const cart =
-    getCart();
-
-
-  if (!cart.length) {
-
-    list.innerHTML = `
-      <div class="empty">
-
-        Your cart is empty.
-
-        <br>
-
-        <a
-          class="btn btn-primary"
-          href="shop.html"
-          style="margin-top:16px"
-        >
-          Browse Products
-        </a>
-
-      </div>
-    `;
-
-
-    if (summary) {
-
-      summary.innerHTML = `
-        <h2>
-          Order Summary
-        </h2>
-
-        <p class="summary-line">
-          No items selected.
-        </p>
-      `;
-    }
-
-
-    return;
-  }
-
-
-  list.innerHTML =
-    cart
-      .map(item => {
-
-        const product =
-          products.find(
-            product =>
-              product.id === item.id
-          );
-
-
-        if (!product) return "";
-
+      .map((product, index) => {
+        const description =
+          product.description || "";
 
         return `
-          <div class="cart-row">
+          <article class="product-card reveal">
 
-            <img
-              src="${escapeHTML(product.image || "")}"
-              alt="${escapeHTML(product.name || "Product")}"
+            <div
+              class="product-image-wrap"
+              data-description-toggle="${escapeHTML(
+                product.id
+              )}"
+              role="button"
+              tabindex="0"
+              aria-label="View description for ${escapeHTML(
+                product.name
+              )}"
             >
+              <img
+                src="${escapeHTML(
+                  product.image || ""
+                )}"
+                alt="${escapeHTML(
+                  product.name
+                )}"
+                class="product-image"
+                loading="${
+                  index < 2
+                    ? "eager"
+                    : "lazy"
+                }"
+              >
 
+              <div class="image-hint">
+                Tap image for details
+              </div>
+            </div>
 
-            <div>
+            <div class="product-content">
 
-              <strong>
+              <h3 class="product-title">
                 ${escapeHTML(
-                  product.name ||
-                  "Product"
+                  product.name
                 )}
-              </strong>
+              </h3>
 
-
-              <div class="catalog-meta">
-                ${formatPrice(
-                  product.price
+              <div
+                class="product-description"
+                id="description-${escapeHTML(
+                  product.id
+                )}"
+                hidden
+              >
+                ${escapeHTML(
+                  description
                 )}
+              </div>
+
+              <div class="product-bottom">
+
+                <div class="product-price">
+                  ${formatPrice(
+                    product
+                  )}
+                </div>
+
+                <div class="product-actions">
+
+                  <button
+                    class="btn btn-primary add-cart-btn"
+                    type="button"
+                    data-product-id="${escapeHTML(
+                      product.id
+                    )}"
+                  >
+                    Add to Cart
+                  </button>
+
+                  <a
+                    class="btn btn-secondary"
+                    href="${getWhatsAppUrl(
+                      product
+                    )}"
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    WhatsApp
+                  </a>
+
+                </div>
+
               </div>
 
             </div>
 
+          </article>
+        `;
+      })
+      .join("");
 
-            <div class="qty">
+  if (
+    visibleProducts.length <
+    list.length
+  ) {
+    container.insertAdjacentHTML(
+      "beforeend",
+      `
+        <div class="see-more-wrap">
+
+          <button
+            id="see-more-products"
+            class="btn btn-primary"
+            type="button"
+          >
+            See More Products
+          </button>
+
+        </div>
+      `
+    );
+  }
+
+  bindProductEvents();
+  observeReveals();
+}
+
+/* =========================================================
+   PRODUCT EVENTS
+   ========================================================= */
+
+function bindProductEvents() {
+  const container =
+    document.getElementById(
+      "product-list"
+    );
+
+  if (!container) return;
+
+  /*
+    Only bind this once.
+
+    Product cards are dynamically recreated when:
+    - searching
+    - clicking See More
+    - rendering products
+
+    Event delegation means Add to Cart continues
+    working after every re-render.
+  */
+
+  if (
+    container.dataset.eventsBound ===
+    "true"
+  ) {
+    return;
+  }
+
+  container.dataset.eventsBound =
+    "true";
+
+  container.addEventListener(
+    "click",
+    event => {
+
+      /* ===============================================
+         ADD TO CART
+         =============================================== */
+
+      const addButton =
+        event.target.closest(
+          ".add-cart-btn"
+        );
+
+      if (addButton) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const productId =
+          addButton.getAttribute(
+            "data-product-id"
+          );
+
+        addToCart(productId);
+
+        const originalText =
+          addButton.textContent;
+
+        addButton.textContent =
+          "Added ✓";
+
+        setTimeout(() => {
+          if (
+            addButton.isConnected
+          ) {
+            addButton.textContent =
+              originalText;
+          }
+        }, 1000);
+
+        return;
+      }
+
+      /* ===============================================
+         SEE MORE
+         =============================================== */
+
+      const seeMoreButton =
+        event.target.closest(
+          "#see-more-products"
+        );
+
+      if (seeMoreButton) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        displayedProductCount +=
+          PRODUCTS_PER_PAGE;
+
+        renderProducts(
+          currentProductList
+        );
+
+        return;
+      }
+
+      /* ===============================================
+         PRODUCT IMAGE DETAILS
+         =============================================== */
+
+      const imageElement =
+        event.target.closest(
+          "[data-description-toggle]"
+        );
+
+      if (imageElement) {
+        const id =
+          imageElement.dataset
+            .descriptionToggle;
+
+        const description =
+          document.getElementById(
+            `description-${CSS.escape(
+              id
+            )}`
+          );
+
+        if (!description) return;
+
+        description.hidden =
+          !description.hidden;
+
+        imageElement.classList.toggle(
+          "description-open",
+          !description.hidden
+        );
+      }
+    }
+  );
+
+  /* ===============================================
+     KEYBOARD ACCESS
+     =============================================== */
+
+  container.addEventListener(
+    "keydown",
+    event => {
+      const imageElement =
+        event.target.closest(
+          "[data-description-toggle]"
+        );
+
+      if (!imageElement) return;
+
+      if (
+        event.key !== "Enter" &&
+        event.key !== " "
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const id =
+        imageElement.dataset
+          .descriptionToggle;
+
+      const description =
+        document.getElementById(
+          `description-${CSS.escape(
+            id
+          )}`
+        );
+
+      if (!description) return;
+
+      description.hidden =
+        !description.hidden;
+
+      imageElement.classList.toggle(
+        "description-open",
+        !description.hidden
+      );
+    }
+  );
+}
+
+/* =========================================================
+   SHOP SEARCH
+   ========================================================= */
+
+function initializeShop() {
+  const searchInput =
+    document.getElementById(
+      "search-input"
+    );
+
+  if (!searchInput) return;
+
+  if (
+    searchInput.dataset.eventsBound ===
+    "true"
+  ) {
+    return;
+  }
+
+  searchInput.dataset.eventsBound =
+    "true";
+
+  searchInput.addEventListener(
+    "input",
+    event => {
+      const searchTerm =
+        event.target.value
+          .trim()
+          .toLowerCase();
+
+      const filteredProducts =
+        PRODUCTS.filter(product => {
+          const name =
+            String(
+              product.name || ""
+            ).toLowerCase();
+
+          const description =
+            String(
+              product.description || ""
+            ).toLowerCase();
+
+          return (
+            name.includes(
+              searchTerm
+            ) ||
+            description.includes(
+              searchTerm
+            )
+          );
+        });
+
+      renderProducts(
+        filteredProducts,
+        true
+      );
+    }
+  );
+}
+
+/* =========================================================
+   CART PAGE
+   ========================================================= */
+
+function renderCart() {
+  const cartList =
+    document.getElementById(
+      "cart-list"
+    );
+
+  if (!cartList) return;
+
+  const cart = getCart();
+
+  if (!cart.length) {
+    cartList.innerHTML = `
+      <div class="empty-state">
+        <h3>Your cart is empty</h3>
+        <p>Add products from the shop to get started.</p>
+      </div>
+    `;
+
+    updateCartSummary();
+
+    return;
+  }
+
+  cartList.innerHTML =
+    cart
+      .map(item => {
+        const price =
+          Number(item.price);
+
+        const hasValidPrice =
+          Number.isFinite(price);
+
+        const subtotal =
+          hasValidPrice
+            ? price *
+              Number(
+                item.quantity || 0
+              )
+            : 0;
+
+        return `
+          <div class="cart-item">
+
+            <div class="cart-item-image">
+              <img
+                src="${escapeHTML(
+                  item.image || ""
+                )}"
+                alt="${escapeHTML(
+                  item.name
+                )}"
+              >
+            </div>
+
+            <div class="cart-item-info">
+
+              <h3>
+                ${escapeHTML(
+                  item.name
+                )}
+              </h3>
+
+              ${
+                hasValidPrice
+                  ? `
+                    <p>
+                      ₦${price.toLocaleString()}
+                    </p>
+                  `
+                  : ""
+              }
+
+              <div class="cart-quantity">
+
+                <button
+                  type="button"
+                  class="qty-btn"
+                  data-product-id="${escapeHTML(
+                    item.id
+                  )}"
+                  data-change="-1"
+                >
+                  −
+                </button>
+
+                <span>
+                  ${Number(
+                    item.quantity || 0
+                  )}
+                </span>
+
+                <button
+                  type="button"
+                  class="qty-btn"
+                  data-product-id="${escapeHTML(
+                    item.id
+                  )}"
+                  data-change="1"
+                >
+                  +
+                </button>
+
+              </div>
+
+              ${
+                hasValidPrice
+                  ? `
+                    <strong>
+                      ₦${subtotal.toLocaleString()}
+                    </strong>
+                  `
+                  : ""
+              }
 
               <button
                 type="button"
-                onclick="changeQty('${product.id}',-1)"
+                class="remove-cart-btn"
+                data-product-id="${escapeHTML(
+                  item.id
+                )}"
               >
-                −
-              </button>
-
-
-              <strong>
-                ${item.qty}
-              </strong>
-
-
-              <button
-                type="button"
-                onclick="changeQty('${product.id}',1)"
-              >
-                +
+                Remove
               </button>
 
             </div>
-
-
-            <button
-              class="remove"
-              type="button"
-              onclick="removeFromCart('${product.id}')"
-            >
-              Remove
-            </button>
 
           </div>
         `;
       })
       .join("");
 
+  /* ===============================================
+     QUANTITY BUTTONS
+     =============================================== */
 
-  const knownTotal =
-    cart.reduce(
-      (sum, item) => {
-
-        const product =
-          products.find(
-            product =>
-              product.id === item.id
+  cartList
+    .querySelectorAll(".qty-btn")
+    .forEach(button => {
+      button.addEventListener(
+        "click",
+        () => {
+          changeQty(
+            button.dataset
+              .productId,
+            Number(
+              button.dataset.change
+            )
           );
+        }
+      );
+    });
 
+  /* ===============================================
+     REMOVE BUTTONS
+     =============================================== */
+
+  cartList
+    .querySelectorAll(
+      ".remove-cart-btn"
+    )
+    .forEach(button => {
+      button.addEventListener(
+        "click",
+        () => {
+          removeFromCart(
+            button.dataset
+              .productId
+          );
+        }
+      );
+    });
+
+  updateCartSummary();
+}
+
+/* =========================================================
+   CART SUMMARY
+   ========================================================= */
+
+function updateCartSummary() {
+  const cart = getCart();
+
+  const subtotal =
+    cart.reduce(
+      (total, item) => {
+        const price =
+          Number(item.price);
+
+        if (
+          !Number.isFinite(price)
+        ) {
+          return total;
+        }
 
         return (
-          sum +
-          (Number(product?.price) || 0) *
-          item.qty
+          total +
+          price *
+            Number(
+              item.quantity || 0
+            )
         );
-
       },
       0
     );
 
+  const subtotalElement =
+    document.getElementById(
+      "cart-subtotal"
+    );
 
-  if (summary) {
+  const totalElement =
+    document.getElementById(
+      "cart-total"
+    );
 
-    summary.innerHTML = `
-      <h2>
-        Order Summary
-      </h2>
+  if (subtotalElement) {
+    subtotalElement.textContent =
+      `₦${subtotal.toLocaleString()}`;
+  }
 
-
-      <div class="summary-line">
-
-        <span>
-          Items
-        </span>
-
-        <span>
-          ${cart.reduce(
-            (sum, item) =>
-              sum + item.qty,
-            0
-          )}
-        </span>
-
-      </div>
-
-
-      <div class="summary-line">
-
-        <span>
-          Products
-        </span>
-
-        <span>
-          ${
-            knownTotal
-              ? formatPrice(
-                  knownTotal
-                )
-              : "To be confirmed"
-          }
-        </span>
-
-      </div>
-
-
-      <div class="summary-line">
-
-        <span>
-          Delivery
-        </span>
-
-        <span id="delivery-summary">
-          To be confirmed
-        </span>
-
-      </div>
-
-
-      <div class="summary-line summary-total">
-
-        <span>
-          Total
-        </span>
-
-        <span>
-          ${
-            knownTotal
-              ? formatPrice(
-                  knownTotal
-                )
-              : "To be confirmed"
-          }
-        </span>
-
-      </div>
-
-
-      <div class="delivery-choice">
-
-        <div
-          class="choice active"
-          data-delivery="delivery"
-        >
-          Delivery
-        </div>
-
-
-        <div
-          class="choice"
-          data-delivery="pickup"
-        >
-          Pickup
-        </div>
-
-      </div>
-
-
-      <div
-        id="delivery-fields"
-        class="form-grid"
-      >
-
-        <div class="field">
-
-          <label>
-            Full name
-          </label>
-
-          <input
-            id="cust-name"
-            placeholder="Your name"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Phone / WhatsApp
-          </label>
-
-          <input
-            id="cust-phone"
-            placeholder="080..."
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Email
-          </label>
-
-          <input
-            id="cust-email"
-            type="email"
-            placeholder="you@example.com"
-          >
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Delivery address
-          </label>
-
-          <textarea
-            id="cust-address"
-            rows="3"
-            placeholder="Address, state and landmark"
-          ></textarea>
-
-        </div>
-
-      </div>
-
-
-      <button
-        class="btn btn-primary"
-        id="checkout-wa"
-        style="width:100%;margin-top:18px"
-      >
-        Complete Order on WhatsApp
-      </button>
-    `;
-
-
-    bindCheckout();
+  if (totalElement) {
+    totalElement.textContent =
+      `₦${subtotal.toLocaleString()}`;
   }
 }
-
 
 /* =========================================================
    CHECKOUT
-========================================================= */
+   ========================================================= */
 
-function bindCheckout() {
-
-  const choices =
-    document.querySelectorAll(
-      ".choice"
+function initializeCheckout() {
+  const checkoutButton =
+    document.getElementById(
+      "checkout-btn"
     );
 
+  if (!checkoutButton) return;
 
-  choices.forEach(choice => {
+  if (
+    checkoutButton.dataset.eventsBound ===
+    "true"
+  ) {
+    return;
+  }
 
-    choice.onclick = () => {
+  checkoutButton.dataset.eventsBound =
+    "true";
 
-      choices.forEach(
-        item =>
-          item.classList.remove(
-            "active"
-          )
-      );
+  checkoutButton.addEventListener(
+    "click",
+    () => {
+      const cart = getCart();
 
-
-      choice.classList.add(
-        "active"
-      );
-
-
-      const fields =
-        document.querySelector(
-          "#delivery-fields"
-        );
-
-
-      if (fields) {
-
-        fields.classList.toggle(
-          "hidden",
-          choice.dataset.delivery ===
-            "pickup"
-        );
-
+      if (!cart.length) {
+        return;
       }
 
-    };
-
-  });
-
-
-  const button =
-    document.querySelector(
-      "#checkout-wa"
-    );
-
-
-  if (button) {
-
-    button.onclick = () => {
-
-      const cart =
-        getCart();
-
-
-      const mode =
-        document.querySelector(
-          ".choice.active"
-        )?.dataset.delivery ||
-        "delivery";
-
-
-      const name =
-        document.querySelector(
-          "#cust-name"
-        )?.value.trim() ||
-        "Not provided";
-
-
-      const phone =
-        document.querySelector(
-          "#cust-phone"
-        )?.value.trim() ||
-        "Not provided";
-
-
-      const email =
-        document.querySelector(
-          "#cust-email"
-        )?.value.trim() ||
-        "Not provided";
-
-
-      const address =
-        document.querySelector(
-          "#cust-address"
-        )?.value.trim() ||
-        "Pickup selected";
-
-
       const lines =
-        cart
-          .map(item => {
+        cart.map(item => {
+          const price =
+            Number(item.price);
 
-            const product =
-              PRODUCTS.find(
-                product =>
-                  product.id === item.id
-              );
+          const priceText =
+            Number.isFinite(price)
+              ? `₦${price.toLocaleString()}`
+              : "";
 
-
-            return (
-              `• ${product?.name || item.id}` +
-              ` × ${item.qty}`
-            );
-
-          })
-          .join("\n");
-
+          return (
+            `${item.name} x${item.quantity}` +
+            (priceText
+              ? ` — ${priceText}`
+              : "")
+          );
+        });
 
       const message =
-`Good day Brychi Enterprises,
-I would like to place an order from your website.
+        `Hello Brychi Enterprises, I would like to order:\n\n` +
+        lines.join("\n") +
+        `\n\nPlease confirm availability and delivery fee.`;
 
-ITEMS:
-${lines}
-
-ORDER TYPE: ${mode}
-
-NAME: ${name}
-
-PHONE: ${phone}
-
-EMAIL: ${email}
-
-ADDRESS: ${address}
-
-Please confirm availability, delivery fee (if applicable), and the final total. Thank you.`;
-
+      const url =
+        `https://wa.me/${WHATSAPP_NUMBER}?text=` +
+        encodeURIComponent(
+          message
+        );
 
       window.open(
-        waLink(message),
+        url,
         "_blank"
       );
-
-    };
-
-  }
+    }
+  );
 }
 
+/* =========================================================
+   MOBILE MENU
+   ========================================================= */
+
+function initializeMenu() {
+  const menuButton =
+    document.getElementById(
+      "menu-btn"
+    );
+
+  const navLinks =
+    document.getElementById(
+      "nav-links"
+    );
+
+  if (
+    !menuButton ||
+    !navLinks
+  ) {
+    return;
+  }
+
+  if (
+    menuButton.dataset.eventsBound ===
+    "true"
+  ) {
+    return;
+  }
+
+  menuButton.dataset.eventsBound =
+    "true";
+
+  menuButton.addEventListener(
+    "click",
+    () => {
+      navLinks.classList.toggle(
+        "open"
+      );
+    }
+  );
+
+  navLinks
+    .querySelectorAll("a")
+    .forEach(link => {
+      link.addEventListener(
+        "click",
+        () => {
+          navLinks.classList.remove(
+            "open"
+          );
+        }
+      );
+    });
+}
 
 /* =========================================================
    REVEAL ANIMATIONS
-========================================================= */
+   ========================================================= */
 
-function initReveal() {
-
-  const items =
+function observeReveals() {
+  const elements =
     document.querySelectorAll(
-      ".reveal:not(.visible)"
+      ".reveal"
     );
-
 
   if (
     !(
-      "IntersectionObserver"
-      in window
+      "IntersectionObserver" in
+      window
     )
   ) {
-
-    items.forEach(
-      item =>
-        item.classList.add(
+    elements.forEach(
+      element =>
+        element.classList.add(
           "visible"
         )
     );
 
-
     return;
   }
-
 
   const observer =
     new IntersectionObserver(
       entries => {
-
         entries.forEach(
           entry => {
-
             if (
               entry.isIntersecting
             ) {
-
               entry.target.classList.add(
                 "visible"
               );
 
-
               observer.unobserve(
                 entry.target
               );
-
             }
-
           }
         );
-
       },
       {
-        threshold: 0.12
+        threshold: 0.08
       }
     );
 
-
-  items.forEach(
-    item =>
-      observer.observe(item)
+  elements.forEach(element =>
+    observer.observe(element)
   );
 }
 
-
 /* =========================================================
-   HTML ESCAPING
-========================================================= */
-
-function escapeHTML(value) {
-
-  return String(value)
-
-    .replaceAll(
-      "&",
-      "&amp;"
-    )
-
-    .replaceAll(
-      "<",
-      "&lt;"
-    )
-
-    .replaceAll(
-      ">",
-      "&gt;"
-    )
-
-    .replaceAll(
-      '"',
-      "&quot;"
-    )
-
-    .replaceAll(
-      "'",
-      "&#039;"
-    );
-}
-
-
-/* =========================================================
-   MAKE CART FUNCTIONS AVAILABLE TO HTML
-========================================================= */
-
-window.addToCart =
-  addToCart;
-
-
-window.removeFromCart =
-  removeFromCart;
-
-
-window.changeQty =
-  changeQty;
-
-
-/* =========================================================
-   PAGE INITIALIZATION
-========================================================= */
+   INITIALIZE
+   ========================================================= */
 
 document.addEventListener(
   "DOMContentLoaded",
-  () => {
+  async () => {
 
-    /* -----------------------------------------------------
-       MOBILE MENU
-    ----------------------------------------------------- */
-
-    const menu =
-      document.querySelector(
-        "#menu-btn"
-      );
-
-
-    const nav =
-      document.querySelector(
-        "#nav-links"
-      );
-
-
-    if (menu && nav) {
-
-      menu.onclick = () => {
-
-        nav.classList.toggle(
-          "open"
-        );
-
-      };
-
-    }
-
-
-    /* -----------------------------------------------------
-       CART BADGE
-    ----------------------------------------------------- */
+    initializeMenu();
 
     updateCartBadge();
 
+    observeReveals();
 
-    /* -----------------------------------------------------
-       REVEAL ANIMATIONS
-    ----------------------------------------------------- */
+    const productList =
+      document.getElementById(
+        "product-list"
+      );
 
-    initReveal();
-
-
-    /* -----------------------------------------------------
+    /* ===============================================
        SHOP PAGE
-    ----------------------------------------------------- */
+       =============================================== */
 
-    if (
-      document.querySelector(
-        "#product-list"
-      )
-    ) {
+    if (productList) {
 
-      initShop();
+      productList.innerHTML = `
+        <div class="loading-state">
+          Loading products...
+        </div>
+      `;
 
+      await getProducts();
+
+      renderProducts(PRODUCTS);
+
+      initializeShop();
     }
 
-
-    /* -----------------------------------------------------
+    /* ===============================================
        CART PAGE
-    ----------------------------------------------------- */
+       =============================================== */
 
-    if (
-      document.querySelector(
-        "#cart-list"
-      )
-    ) {
+    const cartList =
+      document.getElementById(
+        "cart-list"
+      );
+
+    if (cartList) {
+
+      await getProducts();
 
       renderCart();
 
+      initializeCheckout();
     }
-
   }
 );
+
+/* =========================================================
+   GLOBAL CART FUNCTIONS
+   ========================================================= */
+
+window.addToCart = addToCart;
+window.removeFromCart =
+  removeFromCart;
+window.changeQty =
+  changeQty;
